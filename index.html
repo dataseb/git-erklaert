@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Git erklärt</title>
+<style>
+:root{
+  --bg:#0c0d11;--bg2:#12141a;--panel:#171a22;--panel2:#1d212b;
+  --fg:#eef1f6;--dim:#a8b0c0;--faint:#7e879b;
+  --line:#2e3442;--line2:#434a5c;
+  --hot:#ff7a45;--cool:#4ecdc4;--warnc:#ffc65c;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:radial-gradient(1200px 600px at 72% -10%,#1a1f2b,transparent 60%),var(--bg);
+  color:var(--fg);font-family:var(--sans);overflow:hidden;-webkit-font-smoothing:antialiased}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr auto}
+
+header{display:flex;align-items:center;gap:18px;padding:13px 24px;border-bottom:1px solid var(--line)}
+.logo{font-weight:700;letter-spacing:-.02em;font-size:15px}
+.logo span{color:var(--hot)}
+.tabs{display:flex;gap:2px;overflow:hidden}
+.tabs button{font:inherit;font-size:12.5px;background:none;border:none;color:var(--faint);
+  padding:6px 11px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:.18s}
+.tabs button:hover:not(:disabled){color:var(--fg)}
+.tabs button[aria-selected="true"]{color:var(--fg);background:var(--panel2)}
+.tabs button:disabled{opacity:.46;cursor:default}
+.hint{margin-left:auto;font-size:11.5px;color:var(--faint)}
+
+main{display:grid;grid-template-columns:270px 1fr;min-height:0}
+.rail{border-right:1px solid var(--line);padding:20px 0 20px 24px;overflow-y:auto}
+.rail h1{font-size:18px;line-height:1.28;letter-spacing:-.02em;margin-bottom:5px;padding-right:22px}
+.rail .sub{font-size:11.5px;color:var(--faint);margin-bottom:16px;padding-right:22px;line-height:1.5}
+.rail ol{list-style:none;position:relative}
+.rail ol::before{content:"";position:absolute;left:12px;top:12px;bottom:12px;width:1px;background:var(--line2)}
+.rail li button{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:none;
+  border:none;font:inherit;color:var(--dim);cursor:pointer;padding:5.5px 14px 5.5px 0;transition:color .2s}
+.rail li button:hover{color:var(--dim)}
+.rail li .num{flex:none;width:25px;height:25px;border-radius:50%;background:var(--bg2);
+  border:1px solid var(--line2);display:grid;place-items:center;font-size:11px;
+  font-variant-numeric:tabular-nums;color:var(--faint);transition:.25s;position:relative;z-index:1}
+.rail li .lbl{font-size:13px;padding-top:3px;line-height:1.35}
+.rail li[data-done="1"] .num{color:var(--dim);background:var(--panel)}
+.rail li[aria-current="step"] button{color:var(--fg)}
+.rail li[aria-current="step"] .num{background:var(--hot);border-color:var(--hot);color:#1a0d06;
+  font-weight:700;box-shadow:0 0 0 5px rgba(255,122,69,.13)}
+
+.stage{position:relative;padding:18px 26px 8px;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.head{margin-bottom:14px}
+.kicker{display:flex;gap:9px;align-items:center;font-size:10.5px;letter-spacing:.11em;
+  color:var(--faint);margin-bottom:5px}
+.kicker span:first-child{color:var(--hot);font-variant-numeric:tabular-nums}
+.head h3{font-size:20px;letter-spacing:-.02em;margin-bottom:6px}
+.head p{font-size:13.5px;line-height:1.6;color:var(--dim);max-width:98ch}
+.head p b{color:var(--fg);font-weight:600}
+.head p .warn{color:var(--hot)}
+.zones{display:flex;justify-content:space-between}
+.zone{font-size:10.5px;letter-spacing:.14em;color:var(--faint)}
+.zone.r{color:var(--cool);opacity:.7}
+.sentence{min-height:28px;display:flex;align-items:center;gap:9px;margin:4px 0 6px;
+  font-size:14.5px;letter-spacing:-.01em}
+.sentence .n{width:20px;height:20px;border-radius:50%;background:var(--hot);color:#190c05;
+  display:grid;place-items:center;font-size:12px;font-weight:700;flex:none;line-height:1}
+.sentence.off{color:var(--dim);font-size:13px}
+
+.places{flex:1;min-height:196px;max-height:310px;display:grid;grid-template-columns:1fr .66fr 1.5fr 1.06fr;gap:58px;
+  position:relative}
+#wires{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5}
+.place{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+  border-radius:14px;padding:13px;display:flex;flex-direction:column;min-height:0;position:relative;
+  cursor:pointer;transition:.3s;z-index:6}
+.place:hover{border-color:var(--line2)}
+.place[data-live="1"]{border-color:var(--hot);box-shadow:0 0 0 1px var(--hot),0 14px 40px -16px rgba(255,122,69,.55)}
+.place[data-remote="1"]{border-color:#1d3a38}
+.place[data-remote="1"][data-live="1"]{border-color:var(--cool);box-shadow:0 0 0 1px var(--cool),0 14px 40px -16px rgba(78,205,196,.45)}
+.place[data-void="1"]{opacity:.55;border-style:dashed;background:none;cursor:default}
+.place h2{font-size:13.5px;display:flex;align-items:center;gap:7px}
+.place h2 .dot{width:6px;height:6px;border-radius:50%;background:var(--faint);flex:none}
+.place[data-live="1"] h2 .dot{background:var(--hot)}
+.place[data-remote="1"] h2 .dot{background:var(--cool)}
+.place .en{font-size:10.5px;color:var(--faint);margin-top:2px}
+.place .content{flex:1;margin-top:11px;min-height:0;display:flex;flex-direction:column;gap:6px}
+.place .empty{margin:auto;font-size:12px;color:var(--dim);font-style:italic;text-align:center;line-height:1.5}
+.tag{position:absolute;top:11px;right:11px;font-size:9px;letter-spacing:.1em;color:var(--faint);
+  border:1px solid var(--line2);border-radius:4px;padding:2px 5px}
+
+.card{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:7px;padding:6px 9px;font-family:var(--mono);font-size:11.5px;transition:.3s}
+.card .ic{width:10px;height:12px;flex:none;opacity:.5}
+.card .ftag{margin-left:auto;font-family:var(--sans);font-size:9px;letter-spacing:.05em;color:var(--warnc)}
+.card[data-tag="1"]{border-color:#4a4327;background:#241f12}
+.card.ghost{position:fixed;z-index:80;pointer-events:none;box-shadow:0 12px 30px -8px #000}
+
+.chain{margin-top:auto;padding-top:10px}
+.chain.branch{margin-top:16px;padding-top:0}
+.chain .cap{font-size:9px;letter-spacing:.1em;color:var(--faint);margin-bottom:10px}
+.track{display:flex;align-items:center;height:22px}
+.commit{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--dim);background:var(--bg2);flex:none;transition:.35s}
+.commit.fresh{border-color:var(--hot);background:var(--hot);box-shadow:0 0 0 4px rgba(255,122,69,.18)}
+.place[data-remote="1"] .commit.fresh{border-color:var(--cool);background:var(--cool);box-shadow:0 0 0 4px rgba(78,205,196,.18)}
+.link{height:1.5px;background:var(--line2);flex:1;max-width:28px}
+.branch{margin-top:9px;font-size:10.5px;color:var(--faint)}
+.contains{margin-top:7px;font-size:10px;line-height:1.4;color:var(--dim);
+  border-top:1px dashed var(--line2);padding-top:7px}
+.contains b{color:var(--fg)}
+.branch b{color:var(--dim);font-weight:500;font-family:var(--mono)}
+.pages{margin-top:10px;border-top:1px dashed var(--line2);padding-top:9px}
+.pages .k{font-size:9px;letter-spacing:.1em;color:var(--faint)}
+.pages .u{margin-top:5px;font-family:var(--mono);font-size:11px;color:var(--cool);word-break:break-all}
+.repo{border:1px solid var(--line2);border-radius:8px;padding:9px 10px;margin-bottom:8px;background:var(--bg2)}
+.repo.hot{border-color:var(--cool);background:#122320}
+.repo .rn{font-family:var(--mono);font-size:11.5px;color:var(--fg)}
+.repo .rd{font-size:10.5px;color:var(--dim);margin-top:3px;line-height:1.4}
+.prnote{margin-top:auto;font-size:10.5px;color:var(--warnc);line-height:1.45;border-top:1px dashed var(--line2);padding-top:8px}
+
+footer{border-top:1px solid var(--line);padding:13px 26px 15px;display:grid;
+  grid-template-columns:1fr auto;gap:26px;align-items:center}
+.how{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.how h4{font-size:10px;letter-spacing:.1em;color:var(--faint);margin-bottom:7px}
+.how ol{margin:0 0 0 15px;font-size:12.5px;line-height:1.55;color:var(--dim);
+  display:flex;gap:8px 30px;flex-wrap:wrap}
+.how ol li{max-width:34ch}
+
+.how b{color:var(--fg);font-weight:600}
+.how .none{font-size:12.3px;color:var(--faint);font-style:italic}
+.how details{margin-top:8px;border-top:1px solid var(--line2);padding-top:7px}
+.how summary{cursor:pointer;font-size:12px;color:var(--dim);list-style:none}
+.how summary::-webkit-details-marker{display:none}
+.how summary::before{content:"▸ ";color:var(--faint)}
+.how details[open] summary::before{content:"▾ "}
+.how .term{margin-top:6px;font-size:11.5px;color:var(--dim);line-height:1.5}
+.how code{font-family:var(--mono);font-size:11px;color:var(--cool);background:#090a0d;
+  border:1px solid var(--line2);border-radius:4px;padding:1px 5px}
+.nav{display:flex;gap:8px;align-self:center}
+.nav button{font:inherit;font-size:13px;padding:9px 16px;border-radius:8px;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line2);color:var(--fg);transition:.18s}
+.nav button:hover:not(:disabled){border-color:var(--hot);color:var(--hot)}
+.nav button.primary{background:var(--hot);border-color:var(--hot);color:#190c05;font-weight:600}
+.nav button.primary:hover:not(:disabled){filter:brightness(1.1);color:#190c05}
+.nav button:disabled{opacity:.4;cursor:default}
+
+.pop{position:absolute;z-index:90;width:286px;background:var(--panel2);border:1px solid var(--line2);
+  border-radius:12px;padding:15px 16px;box-shadow:0 30px 70px -20px #000;font-size:12.5px;
+  line-height:1.55;color:var(--dim);opacity:0;transform:translateY(6px);pointer-events:none;transition:.2s}
+.pop[data-open="1"]{opacity:1;transform:none;pointer-events:auto}
+.pop h4{font-size:13px;color:var(--fg);margin-bottom:7px}
+.pop .x{position:absolute;top:9px;right:12px;color:var(--faint);cursor:pointer;font-size:15px}
+.pop code{font-family:var(--mono);font-size:11px;color:var(--cool)}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="logo">git<span>.</span>erklärt</div>
+  <div class="tabs" id="tabs"></div>
+  <div class="hint">← → blättern · Kästen anklicken</div>
+</header>
+
+<main>
+  <div class="rail"><h1 id="scTitle"></h1><div class="sub" id="scSub"></div><ol id="steps"></ol></div>
+  <div class="stage">
+    <div class="head">
+      <div class="kicker"><span id="stNo"></span><span id="stRail"></span></div>
+      <h3 id="stTitle"></h3>
+      <p id="stBody"></p>
+    </div>
+    <div class="zones"><div class="zone" id="zoneL">DEIN RECHNER</div><div class="zone r" id="zoneR">IM INTERNET</div></div>
+    <div class="sentence" id="sentence"></div>
+    <div class="places" id="places">
+      <svg id="wires"></svg>
+      <div class="place" data-key="wd"><h2><span class="dot"></span>Arbeitsordner</h2>
+        <div class="en">Working Directory</div><div class="content" id="c-wd"></div></div>
+      <div class="place" data-key="staging"><h2><span class="dot"></span>„Packtisch“</h2>
+        <div class="en">Staging Area</div><div class="content" id="c-staging"></div></div>
+      <div class="place" data-key="local"><h2><span class="dot"></span>Lokales Repo</h2>
+        <div class="en">Local Repository · .git</div><div class="content" id="c-local"></div></div>
+      <div class="place" data-key="github" data-remote="1"><span class="tag">REMOTE</span>
+        <h2><span class="dot"></span>GitHub</h2><div class="en">der gemeinsame Ort</div>
+        <div class="content" id="c-github"></div></div>
+      <div class="pop" id="pop"><span class="x" id="popX">×</span><div id="popBody"></div></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="how"><h4>SO MACHST DU'S</h4><div id="howBody"></div></div>
+  <div class="nav"><button id="prev">Zurück</button><button id="next" class="primary">Weiter →</button></div>
+</footer>
+</div>
+
+<script>
+const FILES=[{id:"f1",name:"index.html"},{id:"f2",name:"styles.css"},{id:"f3",name:"bilder/"}];
+const ALL=["f1","f2","f3"];
+const WD_MAIN=[{name:"index.html"},{name:"styles.css"},{name:"bilder/"}];
+const WD_BRANCH=[{name:"index.html",tag:"ANDERS"},{name:"styles.css"},{name:"bilder/"},{name:"menue.js",tag:"NEU"}];
+const WIRES=[
+ {id:"add",from:"wd",to:"staging",de:"legst drauf, was in den nächsten Stand soll"},
+ {id:"commit",from:"staging",to:"local",de:"hältst den Stand fest"},
+ {id:"push",from:"local",to:"github",de:"lädst hoch, was bei dir festgehalten ist"},
+];
+const POPS={
+ wd:{h:"Arbeitsordner · Working Directory",t:"Was der Finder zeigt. Ganz normale Dateien. Git schaut hier nur zu — es merkt sich nichts von allein."},
+ staging:{h:"„Packtisch“ · Staging Area",t:"Unser Wort, kein Fachbegriff. Du legst drauf, was in die nächste Kiste soll. Die Kiste ist der Commit, die Commit-Nachricht der Aufkleber darauf. Was draufliegt, kannst du wieder runternehmen — verschwunden ist nichts.<br>In GitHub Desktop sind das die <b>Häkchen</b> vor den Dateien: eine Auswahl, die erst beim Commit ausgewertet wird. Im Terminal ist <code>git add</code> strenger — es legt den Stand von <em>diesem</em> Moment hin; änderst du die Datei danach noch, bleibt die spätere Fassung liegen."},
+ local:{h:"Lokales Repo · .git",t:"Ein versteckter Ordner neben deinen Dateien. Darin führt Git Buch: jeder festgehaltene Stand, seit du die Versionskontrolle eingeschaltet hast. Jeder Punkt in der Historie enthält den Stand <b>aller</b> Dateien — löschst du deinen Arbeitsordner, kannst du ihn von hier vollständig wiederherstellen. Reinschauen lohnt nicht: Dort liegen keine lesbaren Dateien, sondern komprimierte Abbilder. Auf github.com siehst du dagegen eine echte Dateiliste — deshalb zeigt der rechte Kasten Dateien und dieser nicht."},
+ github:{h:"GitHub · Remote",t:"Dasselbe Repo noch einmal, nur auf fremden Rechnern und für andere erreichbar. Git lebt auch ohne GitHub. Was es ohne GitHub nicht gibt: ein gemeinsamer Ort, eine öffentliche Adresse, Pull Requests und Issues."},
+};
+
+const SC=[{id:1,tab:"Ich hab was gebaut",ready:true,
+ title:"Ich habe was gebaut und will es zeigen",
+ sub:"Vom Ordner auf dem Schreibtisch zur URL, die du verschicken kannst.",
+ steps:[
+{rail:"Der Ordner",title:"Ein Ordner, mehr nicht",
+ body:`Du hast mit einem KI-Tool einen Prototyp gebaut. Er funktioniert. Er liegt in einem Ordner auf deinem Rechner — <b>und sonst nirgends</b>. Kein Git, kein GitHub, keine Historie. Der Normalzustand, und erstmal völlig in Ordnung.`,
+ how:null,wd:ALL,st:[],hasLocal:false,hasGH:false,live:["wd"]},
+
+{rail:"Das Problem",title:"Eine Datei per Mail hilft nicht weiter",
+ body:`Du willst den Prototyp Kolleg:innen zeigen. Anhang schicken? Dann hat jeder eine eigene Kopie, keiner weiß, welche die neue ist, und beim nächsten Stand fängst du von vorn an. Was du brauchst, ist <b>ein Ort, an dem es liegt</b> — und eine Adresse dorthin.`,
+ how:null,wd:ALL,st:[],hasLocal:false,hasGH:false,live:["wd"]},
+
+{rail:"Versionskontrolle einschalten",title:"Aus dem Ordner wird ein Projekt",
+ body:`Zwei Dinge, die man leicht verwechselt. <b>Git ist ein Programm auf deinem Rechner</b> — GitHub Desktop bringt es mit, du musst nichts extra besorgen. Davon getrennt schaltest du Git <b>in diesem einen Ordner</b> ein. Dabei entsteht ein versteckter Unterordner <b>.git</b>, in dem Git ab jetzt Buch führt. Deine Dateien bleiben unangetastet.`,
+ how:{d:["In GitHub Desktop: <b>File → Add local repository</b>","Deinen Ordner auswählen","Die App meldet, dass hier noch kein Repository ist, und bietet <b>create a repository</b> an — das anklicken"],
+      t:"<code>git init</code> — im Ordner ausgeführt. Legt den versteckten Unterordner <code>.git</code> an. Mehr passiert nicht: keine Datei wird verändert, nichts wird hochgeladen."},
+ wd:ALL,st:[],hasLocal:true,local:0,hasGH:false,live:["local"],hint:"Der Menüpunkt klingt nach Sortieren. Tatsächlich wird hier die Versionskontrolle eingeschaltet."},
+
+{rail:"Auf den Packtisch",title:"Du entscheidest, was zum ersten Stand gehört",
+ body:`Git hält nicht einfach alles fest, was rumliegt. Du legst auf den Packtisch, was in die Kiste soll. <b>Aus dem Arbeitsordner verschwindet dabei nichts</b> — du markierst nur, was mitkommt. Beim ersten Mal ist das meist alles — später legst du gezielt nur das hin, was zusammengehört, und machst daraus mehrere saubere Stände statt einem Klumpen.`,
+ how:{d:["Links stehen alle geänderten Dateien mit einem <b>Häkchen</b> davor","Häkchen setzen heißt: kommt in den nächsten Stand","Häkchen wegnehmen heißt: bleibt liegen, kommt später","Nie mitnehmen: Zugangsdaten und automatisch erzeugte Ordner — dafür gibt es eine Datei <b>.gitignore</b>. Sie wirkt nur vorher: Was einmal in einem Commit steckt, holt keine .gitignore mehr heraus"],
+      t:"<code>git add .</code> legt alles auf den Packtisch, was in <em>diesem</em> Ordner und darunter geändert, neu oder gelöscht ist — außer dem, was in <code>.gitignore</code> steht. Der Punkt heißt „hier“, nicht „das ganze Projekt“. Einzeln geht auch: <code>git add index.html</code>."},
+ wd:ALL,st:[{name:"index.html",tag:"KOMMT REIN"},{name:"styles.css",tag:"KOMMT REIN"},{name:"bilder/",tag:"KOMMT REIN"}],
+ hasLocal:true,local:0,hasGH:false,live:["staging"],wire:["add"],flyAdd:true,
+ hint:"Die Dateien bleiben im Arbeitsordner liegen — auf den Packtisch kommt ein Abbild."},
+
+{rail:"Erster Commit",title:"Die Kiste wird zugemacht und beschriftet",
+ body:`Der Packtisch wird leer — sein Inhalt steckt jetzt in dem neuen Punkt deiner Historie. <b>Ein Commit ist ein Foto vom ganzen Projekt</b> — nicht eine Liste dessen, was du geändert hast. Fotografiert wird der Packtisch: alles, was Git kennt, in dem Zustand, in dem es beim Zumachen der Kiste darauf liegt. Dazu gehört zwingend eine kurze Nachricht: <b>was</b> dieser Stand ist. Ab jetzt kannst du hierher zurück — auch ohne Internet, auch wenn du danach alles kaputt machst. So lange, wie es diesen Zweig gibt.`,
+ how:{d:["Unten links das Feld <b>Summary</b> ausfüllen: „Erster Stand des Prototyps“","Auf <b>Commit to main</b> klicken","Der Knopf sagt dir nur, auf welchem Zweig du gerade stehst — hier <b>main</b>"],
+      t:'<code>git commit -m "Erster Stand des Prototyps"</code> — das <code>-m</code> steht für die Nachricht. Ohne Nachricht geht es nicht.'},
+ wd:ALL,st:[],hasLocal:true,local:1,fresh:true,hasGH:false,live:["local"],wire:["commit"],flyCommit:true,
+ hint:"Der Punkt in der Historie enthält den Stand aller drei Dateien."},
+
+{rail:"Alles noch lokal",title:"Unterwegs ist etwas entstanden, wonach du nicht gefragt hattest",
+ body:`Du wolltest teilen. Bekommen hast du zuerst eine Historie — die stand nicht auf deiner Liste, ist aber ab jetzt deine Rückversicherung. Was noch fehlt, ist das, weswegen du angefangen hast: ein Ort, an den andere kommen. <b>Das sind zwei verschiedene Dinge, und das ist der Kern:</b> Git führt Buch auf deinem Rechner. GitHub ist der Treffpunkt. Für das eine brauchst du das andere nicht.`,
+ how:null,wd:ALL,st:[],hasLocal:true,local:1,hasGH:false,live:["local"]},
+
+{rail:"Probe: Internet aus",title:"Zieh den Stecker — es ändert sich nichts",
+ body:`Trenn die Verbindung und arbeite weiter: ändern, festhalten, in der Historie zurückspringen. Alles geht. <b>Das ist der Beweis für den Satz von eben.</b> Git läuft auf deinem Rechner und braucht kein Netz. Erst wenn du etwas mit anderen austauschen willst, merkst du den Ausfall.`,
+ how:{d:["Nichts zu tun — probier es einfach aus","Commit funktioniert, Push nicht"],
+      t:"<code>git log</code>, <code>git commit</code>, <code>git switch</code> — alles offline. Netz brauchen nur die vier, die mit GitHub reden: <code>clone</code>, <code>fetch</code>, <code>pull</code>, <code>push</code>."},
+ wd:ALL,st:[],hasLocal:true,local:1,hasGH:false,live:["local"],
+ hint:"Kein Netz, keine Einschränkung — solange du allein arbeitest."},
+
+{rail:"Repo auf GitHub anlegen",title:"Der gemeinsame Ort entsteht",
+ body:`Du legst auf GitHub ein leeres Repo an. <b>Auch das ist ein Repo</b> — dasselbe wie der versteckte Ordner bei dir, nur auf fremden Rechnern und für andere erreichbar. Deshalb heißt es „hochladen ins Repo“ und nicht „ins Git“: Git ist das Programm, Repo ist der Ort, und davon hast du ab jetzt zwei. Dabei entsteht seine <b>Adresse</b>, und das ist die Antwort auf „wo kommt die eigentlich her“: Du bekommst sie, weil du das Repo anlegst. Sie musst du nirgends suchen.`,
+ how:{d:["Auf github.com: <b>New repository</b>, Namen vergeben — das Repo ist dann wirklich leer","<b>Private</b> oder <b>Public</b> wählen. Das entscheidet, wer den Quelltext sehen darf","Kürzer geht es in GitHub Desktop mit <b>Publish repository</b> — das legt den Ort an <em>und</em> lädt gleich hoch, macht also diesen und den nächsten Schritt in einem"],
+      t:"Am Terminal zweistufig: Repo auf github.com anlegen, dann <code>git remote add origin &lt;adresse&gt;</code>. <b>origin</b> ist nur der Spitzname, unter dem dein Rechner sich die Adresse merkt."},
+ wd:ALL,st:[],hasLocal:true,local:1,hasGH:true,gh:0,live:["github"],
+ hint:"Privat heißt: nur du und wen du einlädst. Öffentlich heißt: die ganze Welt."},
+
+{rail:"Hochladen",title:"Jetzt steht bei dir und dort dasselbe",
+ body:`Deine Commits wandern nach GitHub. Danach hat GitHub denselben Zweig mit derselben Historie wie du — nicht nur den aktuellen Stand, sondern <b>jeden festgehaltenen Punkt</b>. Hochgeladen wird immer der Zweig, auf dem du gerade stehst; andere bleiben bei dir, bis du sie einzeln hochlädst. Deshalb kann später jemand, der sich das Repo holt, auch in deine Vergangenheit schauen.`,
+ how:{d:["<b>Push origin</b> anklicken","Beim ersten Mal fragt die App nach deinem GitHub-Login","Hast du vorhin <b>Publish repository</b> benutzt, ist das hier schon passiert — der Knopf heißt dann bereits <b>Fetch origin</b>"],
+      t:"<code>git push</code> ohne weitere Angabe schickt alle Commits des aktuellen Zweigs, die drüben noch fehlen. Nicht die Dateien einzeln, sondern die festgehaltenen Stände."},
+ wd:ALL,st:[],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,ghTag:"NEU DA",freshGH:true,
+ live:["github","local"],wire:["push"],flyPush:true,
+ hint:"Dieselben Dateien, derselbe Stand — jetzt an zwei Orten."},
+
+{rail:"Adresse einschalten",title:"Aus dem Repo wird eine Website",
+ body:`Bis hierher liegt dein Prototyp auf GitHub, aber niemand kann ihn <b>anschauen</b> — man sieht nur die Dateien. GitHub Pages macht aus demselben Repo eine echte Website. Ein Schalter, keine zusätzliche Arbeit. <b>Es funktioniert nur für fertige Dateien</b> — HTML, CSS, Bilder. Alles, was eine Datenbank braucht, geht hier nicht.`,
+ how:{d:["Auf github.com in dein Repo gehen","<b>Settings → Pages</b>","Als Quelle den Zweig <b>main</b> auswählen, speichern","Ein bis zwei Minuten warten, dann steht die Adresse da"],
+      t:"Kein Befehl. Das ist eine Einstellung bei GitHub, nicht bei Git."},
+ wd:ALL,st:[],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,pages:true,live:["github"]},
+
+{rail:"URL verschicken",title:"Der Link, um den es die ganze Zeit ging",
+ body:`Du schickst eine Adresse, kein Anhang. Alle sehen dasselbe, und wenn du weiterbaust, sehen sie beim nächsten Öffnen den neuen Stand. <span class="warn">Vorsicht bei Kundeninhalten:</span> Ein öffentliches Repo ist für jeden lesbar, auch die Historie — Gelöschtes bleibt in alten Commits sichtbar. Und ein privates Repo hilft hier weniger, als es klingt: <b>Pages aus einem privaten Repo gibt es nur im bezahlten Plan, und die veröffentlichte Seite ist dann trotzdem für jeden erreichbar, der die Adresse kennt.</b> Privat ist nur der Quelltext. Zugangsgeschützte Seiten gibt es erst in GitHub Enterprise. Für echtes Kundenmaterial heißt das: <b>frag eure Admins, wo so etwas hindarf.</b> Viele Häuser haben dafür längst einen Ort — ein internes GitLab, einen internen Server, eine freigegebene Umgebung. Die Frage ist nicht, ob du GitHub Pages überreden kannst, sondern wo bei euch veröffentlicht werden darf.`,
+ how:{d:["Adresse kopieren und verschicken","Fertig — der Prototyp ist geteilt"],
+      t:"Auch hier nichts zu tippen."},
+ wd:ALL,st:[],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,pages:true,live:["github"]},
+]},
+{id:2,tab:"Ich baue weiter",ready:true,
+ title:"Ich baue weiter",
+ sub:"Der Alltag: ändern, festhalten, hochladen — und die URL zeigt den neuen Stand.",
+ steps:[
+{rail:"Gleichstand",title:"Bei dir und auf GitHub liegt dasselbe",
+ body:`Der Prototyp ist geteilt, die URL verschickt. Ein Stand ist festgehalten und hochgeladen. Von hier an wiederholt sich immer dieselbe Schleife — und die ist der eigentliche Alltag mit Git.`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,pages:true,live:[]},
+
+{rail:"Zwei Änderungen",title:"Ein Text und eine Farbe — die nichts miteinander zu tun haben",
+ body:`Du korrigierst einen Tippfehler in <b>index.html</b> und änderst nebenbei die Hintergrundfarbe in <b>styles.css</b>. Zwei Änderungen, zwei Themen. Git zeigt beide an und wartet.`,
+ how:{d:["Beide Dateien tauchen links in der Liste auf","Klick auf eine Datei zeigt rechts genau, welche Zeilen sich geändert haben"],
+      t:"<code>git status</code> listet beide als geändert. <code>git diff</code> zeigt die Zeilen."},
+ wd:[{name:"index.html",tag:"GEÄNDERT"},{name:"styles.css",tag:"GEÄNDERT"},{name:"bilder/"}],
+ st:[],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,pages:true,live:["wd"]},
+
+{rail:"Erst das eine",title:"Nur den Tippfehler auf den Packtisch",
+ body:`Du setzt das Häkchen nur bei index.html. Die Farbänderung bleibt liegen — sie ist nicht verloren, sie kommt nur nicht in diese Kiste. <b>Das ist der ganze Zweck des Packtischs:</b> Du zerlegst einen Nachmittag Arbeit in Stände, die jeder für sich Sinn ergeben.`,
+ how:{d:["Häkchen bei <b>index.html</b> setzen","Häkchen bei <b>styles.css</b> wegnehmen"],
+      t:"<code>git add index.html</code> — nur diese eine Datei."},
+ wd:[{name:"index.html"},{name:"styles.css",tag:"GEÄNDERT"},{name:"bilder/"}],
+ st:[{name:"index.html",tag:"KOMMT REIN"}],hasLocal:true,local:1,hasGH:true,gh:1,ghFiles:true,pages:true,
+ live:["staging"],wire:["add"],hint:"styles.css bleibt liegen — geändert, aber nicht vorgemerkt."},
+
+{rail:"Festhalten",title:"Der erste der beiden Stände",
+ body:`Der Packtisch wird leer, in der Historie steht ein neuer Punkt. Er hält den <b>ganzen</b> Projektstand fest — der einzige Unterschied zum Punkt davor ist der Tippfehler. Die Farbänderung ist immer noch da, unangetastet, im Arbeitsordner.`,
+ how:{d:["Nachricht: „Tippfehler in der Überschrift“","<b>Commit to main</b>"],
+      t:"<code>git commit -m \"Tippfehler in der Überschrift\"</code>"},
+ wd:[{name:"index.html"},{name:"styles.css",tag:"GEÄNDERT"},{name:"bilder/"}],
+ st:[],hasLocal:true,local:2,fresh:true,hasGH:true,gh:1,ghFiles:true,pages:true,
+ live:["local"],wire:["commit"],hint:"Ein Commit, eine Sache."},
+
+{rail:"Dann das andere",title:"Und jetzt die Farbe, als eigener Stand",
+ body:`Warum der Aufwand? Weil du später genau einen davon zurücknehmen kannst — den Tippfehler behalten, die Farbe verwerfen. In einem gemeinsamen Commit steckt beides drin — dann musst du die Farbe einzeln herausfummeln, statt einen Stand zurückzunehmen. <b>Ein Commit, eine Sache.</b>`,
+ how:{d:["Häkchen bei <b>styles.css</b>","Nachricht: „Hintergrund heller“","<b>Commit to main</b>"],
+      t:"<code>git add styles.css</code>, dann <code>git commit -m \"Hintergrund heller\"</code>"},
+ wd:WD_MAIN,st:[],hasLocal:true,local:3,fresh:true,hasGH:true,gh:1,ghFiles:true,pages:true,
+ live:["local"],wire:["commit"],hint:"Zwei Punkte statt einem — jeder für sich zurücknehmbar."},
+
+{rail:"Hochladen",title:"Und die URL zeigt den neuen Stand",
+ body:`Beide Commits wandern nach GitHub. Pages baut die Seite neu — nach ein bis zwei Minuten sehen deine Kolleg:innen unter <b>derselben Adresse</b> die neue Version. Du musst nichts neu verschicken. Das ist der Unterschied zum Anhang: Der Link bleibt, der Inhalt wird aktuell.`,
+ how:{d:["<b>Push origin</b>","Kurz warten, Seite neu laden"],
+      t:"<code>git push</code>"},
+ wd:WD_MAIN,st:[],hasLocal:true,local:3,hasGH:true,gh:3,ghFiles:true,ghTag:"AKTUALISIERT",pages:true,freshGH:true,
+ live:["github","local"],wire:["push"],hint:"Die Adresse bleibt dieselbe — der Inhalt dahinter ist neu."},
+]},
+{id:3,tab:"Was ausprobieren",ready:true,
+ title:"Ich will was ausprobieren, ohne das Laufende kaputtzumachen",
+ sub:"Zweige: ein zweiter Weg neben dem, der funktioniert.",
+ steps:[
+{rail:"Es läuft",title:"Dein Prototyp steht, die URL ist verschickt",
+ body:`Drei Stände festgehalten, hochgeladen, Kolleg:innen schauen drauf. Der Weg, auf dem das alles liegt, heißt <b>main</b> — der Hauptzweig, der laufen soll.`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:0,head:"main",bname:""},live:[]},
+
+{rail:"Eine riskante Idee",title:"Eine ganz andere Navigation — vielleicht",
+ body:`Du hast eine Idee, die den halben Prototyp umbaut. Vielleicht wird sie gut, vielleicht Murks. Und genau hier sitzt die Angst: <b>Wenn ich es kaputt mache, ist die Version kaputt, die ich gerade verschickt habe.</b> Auf main weiterzubauen wäre genau das.`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:0,head:"main",bname:""},live:["local"]},
+
+{rail:"Zweig anlegen",title:"Ein zweiter Weg, der beim aktuellen Stand abzweigt",
+ body:`Ein Zweig ist <b>keine Kopie</b> deines Projekts. Nichts wird dupliziert, kein zweiter Ordner angelegt, es kostet keinen Speicher. Git merkt sich nur einen Namen und den Commit, auf dem er gerade steht — und schiebt den Namen mit jedem neuen Commit weiter, den du machst, solange du auf ihm stehst. Mehr ist ein Zweig nicht. Deshalb legt man Zweige an wie andere Leute ein neues Blatt Papier nehmen.`,
+ how:{d:["Oben in GitHub Desktop auf <b>Current Branch</b> klicken","<b>New Branch</b>, Namen vergeben: <i>nav-test</i>","Der Name ist frei — er beschreibt, was du vorhast"],
+      t:"<code>git switch -c nav-test</code> — legt den Zweig an und stellt dich gleich drauf. Das <code>-c</code> steht für <i>create</i>."},
+ wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:1,head:"branch",bname:"nav-test"},live:["local"],
+ hint:"Der Zweig beginnt bei dem Stand, auf dem du gerade stehst."},
+
+{rail:"Wo bin ich gerade?",title:"Die wichtigste Anzeige des ganzen Tages",
+ body:`Es gibt genau eine Stelle, an der steht, auf welchem Zweig du arbeitest — oben in GitHub Desktop unter <b>Current Branch</b>. Im Finder steht sie nicht. <b>Der Finder zeigt immer nur einen Zweig</b>, nämlich den, auf dem du stehst, und sagt dir nicht welchen. Wer das nicht weiß, ändert irgendwann stundenlang Dateien auf dem falschen Weg.`,
+ how:{d:["GitHub Desktop, oben in der Mitte: <b>Current Branch: nav-test</b>","Dort klickst du auch zum Wechseln","Im Finder gibt es dafür nichts — gar nichts"],
+      t:"<code>git status</code> — die erste Zeile lautet <i>On branch nav-test</i>. Deshalb tippen Entwickler:innen den Befehl ständig."},
+ wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:1,head:"branch",bname:"nav-test"},live:["local"]},
+
+{rail:"Arbeiten auf dem Zweig",title:"Zwei Stände später — und main hat nichts gemerkt",
+ body:`Du änderst, hältst fest, änderst weiter. Alles landet auf <b>nav-test</b>. main steht unverändert da, wo es war. Die Version, die deine Kolleg:innen unter der URL sehen, ist unberührt — hier kannst du nichts kaputtmachen, was schon geteilt ist.`,
+ how:{d:["Ganz normal arbeiten: ändern, Häkchen setzen, <b>Commit to nav-test</b>","Der Knopf heißt jetzt anders — er nennt immer den Zweig, auf dem du stehst"],
+      t:"Dieselben Befehle wie immer: <code>git add</code>, <code>git commit</code>. Der Zweig entscheidet, wo sie landen."},
+ hint:"Packtisch und Commit laufen wie in Szenario 2 — hier nicht noch einmal gezeigt.",
+ wd:WD_BRANCH,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:3,head:"branch",bname:"nav-test"},live:["local","wd"]},
+
+{rail:"Zurückschalten",title:"Die Dateien verwandeln sich vor deinen Augen",
+ body:`Du schaltest auf main zurück. Jetzt passiert das, womit niemand rechnet: <b>Die Dateien im Arbeitsordner ändern sich.</b> menue.js ist weg, index.html ist wieder die alte. Nicht gelöscht — Git tauscht den Inhalt des Ordners gegen den Stand des Zweigs aus, auf dem du jetzt stehst. Schaltest du zurück, ist alles wieder da. <b>Ausgetauscht wird nur, was Git kennt:</b> Dateien, die du nie festgehalten hast, bleiben liegen, egal auf welchem Zweig du stehst.`,
+ how:{d:["<b>Current Branch → main</b> auswählen","Der Finder aktualisiert sich, während du zuschaust","Ungesichertes nimmt Git meist mit; es verweigert nur, wenn es dabei überschrieben würde. Vorher festhalten, dann stellt sich die Frage nicht"],
+      t:"<code>git switch main</code> — dasselbe. Früher hieß das <code>git checkout main</code>, beides geht noch."},
+ wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:3,head:"main",bname:"nav-test"},live:["wd","local"],
+ hint:"Ein Ordner, mehrere Zweige — sichtbar ist immer nur einer."},
+
+{rail:"Zusammenführen",title:"Zusammenführen: der Zweig kommt zurück in main",
+ body:`Die neue Navigation überzeugt. Also holst du die Arbeit nach main — das heißt <b>mergen</b>. Zwei Fälle: Hat sich auf main inzwischen nichts getan, wie hier, schiebt Git main einfach auf den Stand von nav-test vor. Kein neuer Punkt, die Historie bleibt eine Linie. Hat sich auf main parallel etwas getan, baut Git beide Wege zusammen und setzt dafür einen eigenen Punkt. Dessen Aufkleber schreibt Git selbst, sinngemäß „zusammengeführt mit nav-test“ — GitHub Desktop fragt dich gar nicht erst. <b>Auf den Packtisch legst du hier nichts</b>, das übernimmt Git; zurück auf den Tisch musst du nur, wenn Git nicht weiterweiß. Danach enthält main alles, und der Zweig hat seinen Zweck erfüllt. Erst nach dem Hochladen ändert sich auch die Version, die deine Kolleg:innen sehen.`,
+ how:{d:["Auf <b>main</b> stehen","<b>Branch → Merge into current branch</b>, nav-test auswählen","Danach <b>Push origin</b>, damit es auch drüben ankommt"],
+      t:"<code>git merge nav-test</code> — auf main ausgeführt."},
+ wd:WD_BRANCH,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:4,fork:2,branch:3,head:"main",bname:"nav-test",merged:true},live:["local"]},
+
+{rail:"Oder wegwerfen",title:"Wegwerfen kostet nichts",
+ body:`Die Idee war Murks. Du löschst den Zweig, und aus deiner Sicht ist alles weg, was darauf entstanden ist. (Ganz kurz ließe sich ein versehentlich gelöschter Zweig noch zurückholen — plan nicht damit.) <b>main hat davon nie etwas mitbekommen.</b> Genau dafür gibt es Zweige: etwas ernsthaft probieren, ohne es ernsthaft zu riskieren.`,
+ how:{d:["Auf main wechseln","<b>Branch → Delete…</b>","Fertig. Nichts zu reparieren"],
+      t:"<code>git branch -d nav-test</code>"},
+ wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:0,head:"main",bname:""},live:["local"]},
+
+{rail:"Muss ein Zweig zurück?",title:"Nein. Aber je länger er offen ist, desto teurer wird er",
+ body:`Ein Zweig darf ewig bestehen, Git zwingt dich zu nichts. Nur: Je länger du daneben herläufst, desto weiter driften die beiden Wege auseinander, und desto mühsamer wird das Zusammenführen. <b>Faustregel: ein Zweig, eine Sache, wenige Tage.</b> Nicht „mein Zweig", sondern „der Zweig für diese eine Idee".`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,hasGH:true,gh:3,ghFiles:true,pages:true,
+ br:{main:3,fork:2,branch:0,head:"main",bname:""},live:[]},
+]},
+{id:4,tab:"Jemand holt sich meins",ready:true,
+ title:"Jemand holt sich meins — oder ich seins",
+ sub:"Clone und Pull, von der anderen Seite aus gesehen.",
+ steps:[
+{rail:"Sie will mitbauen",title:"Anschauen reicht ihr nicht",
+ body:`Die meisten schauen sich deinen Prototyp nur über die URL an. Diese eine will ihn aber selbst laufen lassen und daran weiterbauen. Dafür braucht sie das Projekt auf ihrem Rechner.`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,local:3,hasGH:true,gh:3,ghFiles:true,pages:true,live:["github"]},
+
+{rail:"Sie klont",title:"Clone holt alles — auch deine ganze Vergangenheit",
+ body:`Ein Vorgang, und auf ihrem Rechner entsteht ein Ordner mit deinen Dateien <b>und</b> ein lokales Repo mit <b>jedem einzelnen Commit</b>, den du je gemacht hast — und mit <b>allen Zweigen</b>, nicht nur main. Ausgepackt im Arbeitsordner ist davon immer nur einer. Deshalb kann sie offline in deiner Historie zurückspringen — und deshalb ist es keine gute Idee, je ein Passwort einzuchecken: Gelöschtes bleibt in alten Commits stehen.`,
+ how:{d:["Auf github.com: grüner Knopf <b>Code → Open with GitHub Desktop</b>","Ordner wählen, fertig"],
+      t:"<code>git clone https://github.com/seb/prototyp.git</code> — legt den Ordner an und merkt sich die Adresse als <code>origin</code>."},
+ zoneL:"DER RECHNER DEINER KOLLEGIN",
+ wd:WD_MAIN,st:[],hasLocal:true,local:3,hasGH:true,gh:3,ghFiles:true,pages:true,
+ live:["local","wd"],wire:[],
+ hint:"Clone ist einmalig: Es legt den Ordner überhaupt erst an."},
+
+{rail:"Was sie jetzt hat",title:"Ein vollständiges eigenes Repo",
+ body:`Ihr Rechner sieht jetzt genauso aus wie deiner: Arbeitsordner, Packtisch, lokales Repo. <b>Ihr seid nicht miteinander verbunden</b> — ihr hängt beide nur am selben Ort auf GitHub. Was sie ändert, siehst du nicht, bis sie hochlädt.`,
+ how:null,zoneL:"DER RECHNER DEINER KOLLEGIN",
+ wd:WD_MAIN,st:[],hasLocal:true,local:3,hasGH:true,gh:3,ghFiles:true,pages:true,live:["local"]},
+
+{rail:"Neuer Stand von dir",title:"Du lädst hoch, ohne ihr Bescheid zu sagen",
+ body:`Du machst zwei neue Stände und lädst sie hoch. Auf GitHub stehen jetzt zwei Commits mehr als bei ihr. <b>Nichts wandert von allein.</b> Sie merkt davon erst etwas, wenn sie nachschaut.`,
+ how:null,zoneL:"DER RECHNER DEINER KOLLEGIN",
+ wd:WD_MAIN,st:[],hasLocal:true,local:3,hasGH:true,gh:5,ghFiles:true,ghTag:"NEUER STAND",pages:true,freshGH:true,
+ live:["github"],hint:"Drüben fünf Commits, bei ihr drei — und nichts wandert von allein."},
+
+{rail:"Sie holt",title:"Pull bringt sie auf Stand",
+ body:`<b>Clone war einmalig, Pull ist der Alltag.</b> Clone legt den Ordner an — das geht genau einmal. Pull holt danach, was dazugekommen ist, immer wieder. Pull sind dabei zwei Schritte in einem Knopf: <b>holen</b> (das ist Fetch, und das ist immer harmlos — es fasst keine deiner Dateien an) und <b>einarbeiten</b>. Deshalb kannst du jederzeit erst nachschauen und dich dann entscheiden. Zwei Wirkungen: die fehlenden Commits landen in ihrer Historie, und ihre Dateien werden aktualisiert. Hat sie selbst nichts geändert, passiert das lautlos. Hat sie eigene Stände <b>festgehalten</b>, führt Git beides zusammen. Hat sie nur im Arbeitsordner herumgeändert, ohne es festzuhalten, kommt es darauf an, ob dieselben Dateien betroffen sind: sind sie es nicht, läuft der Pull durch und ihre Änderungen bleiben liegen. Sind sie es, <b>bricht Git ab und rührt nichts an</b> — erst festhalten, dann holen. <span class="warn">Ein Konflikt entsteht erst, wenn ihr denselben Bereich einer Datei angefasst habt; benachbarte Zeilen reichen dafür schon.</span>`,
+ how:{d:["<b>Fetch origin</b> klicken — die App zeigt, dass es Neues gibt","<b>Pull origin</b> klicken"],
+      t:"<code>git pull</code> — zweierlei in einem: holen (<code>fetch</code>) und einarbeiten (<code>merge</code>). Beim allerersten Mal fragt Git nach, wie es zusammenführen soll; GitHub Desktop nimmt dir die Frage ab."},
+ zoneL:"DER RECHNER DEINER KOLLEGIN",
+ wd:[{name:"index.html",tag:"AKTUALISIERT"},{name:"styles.css",tag:"AKTUALISIERT"},{name:"bilder/"}],
+ st:[],hasLocal:true,local:5,fresh:true,hasGH:true,gh:5,ghFiles:true,pages:true,
+ live:["local","wd"],hint:"Zwei Wirkungen auf einmal: Historie ergänzt, Dateien neu geschrieben."},
+
+{rail:"Und umgekehrt",title:"Genauso holst du dir, was andere gebaut haben",
+ body:`Dasselbe in die andere Richtung: Findest du ein Projekt, das du selbst laufen lassen willst, klonst du es. Du bekommst alles, du kannst alles ausprobieren — und <b>ändern kannst du dort nichts, was andere sehen</b>, solange du keine Schreibrechte hast. Dein Clone ist deiner.`,
+ how:null,wd:WD_MAIN,st:[],hasLocal:true,local:5,hasGH:true,gh:5,ghFiles:true,pages:true,live:[]},
+]},
+{id:5,tab:"Bei jemandem mitarbeiten",ready:true,
+ title:"Ich arbeite bei jemand anderem mit",
+ sub:"Fork und Pull Request — der seltenste Fall, aber der mit den meisten Ängsten.",
+ steps:[
+{rail:"Fremdes Repo",title:"Du willst etwas verbessern, das dir nicht gehört",
+ body:`Ein Projekt von jemand anderem, du hast eine Idee dafür. Auf github.com kannst du alles lesen — und sonst nichts. <b>Schreibrechte hast du nicht</b>, und ohne die kannst du in <em>diesem</em> Repo nichts ändern. Kaputtmachen also auch nicht, auch nicht aus Versehen.`,
+ how:null,zoneL:"DEIN RECHNER",
+ wd:[],st:[],hasLocal:false,hasGH:false,
+ repos:[{name:"fremd/projekt",note:"gehört jemand anderem · du darfst lesen, nicht schreiben"}],live:["github"]},
+
+{rail:"Fork",title:"Eine eigene Kopie — mit Nabelschnur zum Original",
+ body:`Ein Klick, und in <b>deinem eigenen GitHub-Konto</b> liegt dasselbe Projekt noch einmal als eigenständiges Repo: dein <b>Fork</b>. Ab jetzt gehört es dir vollständig. Du forkst genau deshalb — weil dir im fremden Repo die Schreibrechte fehlen und der Fork die Arbeit an einen Ort verschiebt, an dem du sie hast. Er bringt die <b>vollständige Historie</b> mit. Und er behält die <b>Verbindung</b> zum Original — GitHub weiß, wovon er abstammt. Genau deshalb kannst du später überhaupt etwas zurückgeben. Ohne diese Verbindung wäre ein Fork eine Sackgasse.`,
+ how:{d:["Auf github.com im fremden Repo oben rechts: <b>Fork</b>","Fertig — jetzt liegt eine Kopie unter deinem Namen"],
+      t:"Kein Befehl. Fork ist eine Funktion von GitHub, nicht von Git."},
+ wd:[],st:[],hasLocal:false,hasGH:false,
+ repos:[{name:"fremd/projekt",note:"das Original"},{name:"du/projekt",note:"dein Fork · volle Historie · verbunden mit dem Original",hot:true}],
+ live:["github"]},
+
+{rail:"Arbeiten wie immer",title:"Ab hier ist nichts neu",
+ body:`Du klonst deinen Fork, änderst, hältst fest, lädst hoch. <b>Alles genau wie in deinem eigenen Projekt</b> — denn der Fork <em>ist</em> dein eigenes Projekt. Das Original bleibt unberührt.<br><br><b>Einen Zweig brauchst du hier nicht.</b> Kaputtmachen kannst du bei anderen ohnehin nichts mehr. Zwei Gründe gibt es trotzdem: Ein Pull Request geht immer von einem Zweig aus — auf main kannst du nur eine Sache gleichzeitig anbieten. Und dein main bleibt sauber, falls du deinen Fork später mit dem Original abgleichen willst.`,
+ how:{d:["<b>Code → Open with GitHub Desktop</b> auf deinem Fork","Ändern, <b>Commit</b>, <b>Push</b> — wie immer","Für einen Pull Request vorher einen Zweig anlegen"],
+      t:"<code>git clone</code> deinen Fork, arbeiten, <code>git push</code>. Mit Zweig: <code>git switch -c meine-idee</code> dazwischen."},
+ zoneL:"DEIN RECHNER",
+ wd:WD_BRANCH,st:[],hasLocal:true,local:4,hasGH:false,
+ repos:[{name:"fremd/projekt",note:"unberührt"},{name:"du/projekt",note:"deine Änderung liegt jetzt hier",hot:true}],
+ live:["local","wd"]},
+
+{rail:"Pull Request",title:"Du fragst an, ob deine Änderung übernommen wird",
+ body:`Ein Pull Request ist keine Einbahnstraße und kein Befehl — es ist eine <b>Anfrage</b>. Du sagst: „Hier ist, was ich geändert habe, magst du das haben?" Die andere Person sieht die Änderung zeilenweise, kann kommentieren, nachfragen, ablehnen. <b>Bis sie zustimmt, passiert im Original nichts.</b>`,
+ how:{d:["Auf github.com in deinem Fork: <b>Contribute → Open pull request</b>","Titel und kurze Beschreibung: was und warum","Absenden — jetzt ist die andere Person am Zug"],
+      t:"Kein Befehl. Auch der Pull Request ist GitHub, nicht Git. Bei GitLab heißt dasselbe <b>Merge Request</b>."},
+ wd:[],st:[],hasLocal:false,hasGH:false,
+ repos:[{name:"fremd/projekt",note:"wartet auf Entscheidung"},{name:"du/projekt",note:"deine Änderung liegt bereit",hot:true}],
+ prNote:"Pull Request offen — bis zur Zustimmung ändert sich am Original nichts.",
+ live:["github"]},
+
+{rail:"Für Prototypen selten",title:"Meistens nimmst du es einfach als Vorlage",
+ body:`Bei gemeinsamer Softwareentwicklung ist das der Normalweg. Bei Prototypen fast nie: Wer den Stand eines anderen nimmt, nimmt ihn als <b>Startpunkt für sich</b> und spielt ihn nicht zurück. Dafür reicht ein Fork ohne Pull Request — oder gleich ein Clone. Du musst niemandem etwas zurückgeben.`,
+ how:null,
+ wd:[],st:[],hasLocal:false,hasGH:false,
+ repos:[{name:"fremd/projekt",note:"bleibt, wie es war"},{name:"du/projekt",note:"geht seinen eigenen Weg",hot:true}],
+ live:[]},
+]}];
+
+let sc=0,cur=0;
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
+const ICON=`<svg class="ic" viewBox="0 0 11 13"><path d="M1 1h6l3 3v8H1z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>`;
+const steps=()=>SC[sc].steps;
+const card=f=>{const o=typeof f==="string"?FILES.find(x=>x.id===f):f;
+  const c=el("div","card",ICON+`<span>${o.name}</span>`+(o.tag?`<span class="ftag">${o.tag}</span>`:""));
+  if(o.tag)c.dataset.tag="1";c.dataset.fid=o.id||o.name;return c};
+function chain(n,fresh,contains){
+  const w=el("div","chain");w.appendChild(el("div","cap","HISTORIE · COMMITS"));
+  const t=el("div","track");
+  if(n===0)t.appendChild(el("div","empty","noch kein Stand festgehalten"));
+  for(let i=0;i<n;i++){if(i)t.appendChild(el("div","link"));
+    t.appendChild(el("div","commit"+(fresh&&i===n-1?" fresh":"")))}
+  w.appendChild(t);
+  if(n){w.appendChild(el("div","branch",'Zweig: <b>main</b>'));
+    if(contains)w.appendChild(el("div","contains",
+      'jeder Punkt enthält den Stand <b>aller</b> Dateien'));}
+  return w}
+function branchChain(b){
+  const D=32,X0=18,yM=32,yB=84;
+  const mx=i=>X0+i*D, bx=j=>X0+(b.fork+1+j)*D;
+  let g=`<text x="0" y="10" font-size="9" fill="#5b6275" letter-spacing=".1em">HISTORIE · COMMITS</text>`;
+  for(let i=1;i<b.main;i++)g+=`<line x1="${mx(i-1)}" y1="${yM}" x2="${mx(i)}" y2="${yM}" stroke="#535b70" stroke-width="1.5" stroke-linecap="round"/>`;
+  if(b.branch){
+    g+=`<path d="M ${mx(b.fork)} ${yM} C ${mx(b.fork)+18} ${yM}, ${bx(0)-18} ${yB}, ${bx(0)} ${yB}" fill="none" stroke="#535b70" stroke-width="1.5" stroke-linecap="round"/>`;
+    for(let j=1;j<b.branch;j++)g+=`<line x1="${bx(j-1)}" y1="${yB}" x2="${bx(j)}" y2="${yB}" stroke="#535b70" stroke-width="1.5" stroke-linecap="round"/>`;
+  }
+  if(b.merged){const last=mx(b.main-1);
+    g+=`<path d="M ${bx(b.branch-1)} ${yB} C ${bx(b.branch-1)+18} ${yB}, ${last-18} ${yM}, ${last} ${yM}" fill="none" stroke="#ff7a45" stroke-width="1.8"/>`;}
+  const dot=(x,y,hot)=>`<circle cx="${x}" cy="${y}" r="5.5" fill="${hot?"#ff7a45":"#12141a"}" stroke="${hot?"#ff7a45":"#98a1b4"}" stroke-width="1.5"/>`;
+  for(let i=0;i<b.main;i++)g+=dot(mx(i),yM,b.merged&&i===b.main-1);
+  for(let j=0;j<(b.branch||0);j++)g+=dot(bx(j),yB,b.head==="branch"&&j===b.branch-1);
+  g+=`<text x="${mx(b.main-1)+14}" y="${yM+4}" font-size="10.5" fill="${b.head==="main"?"#ff7a45":"#8b93a6"}" font-family="ui-monospace,Menlo,monospace">main</text>`;
+  if(b.branch)g+=`<text x="${bx(b.branch-1)+14}" y="${yB+4}" font-size="10.5" fill="${b.head==="branch"?"#ff7a45":"#8b93a6"}" font-family="ui-monospace,Menlo,monospace">${b.bname}</text>`;
+  const hx=b.head==="branch"?bx(b.branch-1):mx(b.main-1), hy=b.head==="branch"?yB:yM;
+  g+=`<circle cx="${hx}" cy="${hy}" r="10.5" fill="none" stroke="#ff7a45" stroke-width="1.3" opacity=".55"/>
+    <text x="${hx}" y="${hy+26}" font-size="8.5" fill="#ff7a45" text-anchor="middle" letter-spacing=".08em">HIER BIST DU</text>`;
+  const w=el("div","chain branch");
+  w.innerHTML=`<svg viewBox="0 0 300 150" style="width:100%;height:auto;overflow:visible">${g}</svg>`;
+  return w;
+}
+function fly(a,b,node,ms){
+  const g=node.cloneNode(true);g.classList.add("ghost");
+  g.style.cssText+=`left:${a.left}px;top:${a.top}px;width:${a.width}px`;
+  document.body.appendChild(g);
+  g.animate([{transform:"translate(0,0)",opacity:.95},
+   {transform:`translate(${b.left-a.left}px,${b.top-a.top}px)`,opacity:0}],
+   {duration:ms||640,easing:"cubic-bezier(.22,.8,.3,1)"}).onfinish=()=>g.remove()}
+
+function drawWires(s){
+  const host=$("#places").getBoundingClientRect(),R={};
+  document.querySelectorAll(".place").forEach(p=>{const r=p.getBoundingClientRect();
+    R[p.dataset.key]={l:r.left-host.left,r:r.right-host.left,t:r.top-host.top,b:r.bottom-host.top}});
+  const act=new Set(s.wire||[]);
+  let out=`<defs>
+   <marker id="mA" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="#ff7a45"/></marker>
+   <marker id="mD" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <path d="M0 0 L10 5 L0 10 z" fill="#4a5266"/></marker></defs>`;
+  WIRES.forEach(w=>{
+    const A=R[w.from],B=R[w.to];if(!A||!B)return;
+    const on=act.has(w.id),y=(A.t+A.b)/2,x1=A.r+8,x2=B.l-8;
+    out+=`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${on?"#ff7a45":"#4a5266"}"
+      stroke-width="${on?2.4:1.3}" marker-end="url(#${on?"mA":"mD"})" opacity="${on?1:.85}"/>`;
+  });
+  $("#wires").innerHTML=out;
+  const band=$("#sentence"),w=(s.wire||[]).length?WIRES.find(x=>x.id===s.wire[0]):null;
+  if(w){band.className="sentence";band.innerHTML=`<span class="n">→</span><span>Du ${w.de}</span>`}
+  else{band.className="sentence off";band.innerHTML=s.hint||"Nichts bewegt sich — es ändert sich nur, was es gibt."}
+}
+
+function render(i,dir){
+  const s=steps()[i];
+  const bWd=[...document.querySelectorAll('#c-wd [data-fid]')].map(n=>({n,r:n.getBoundingClientRect()}));
+  const bSt=[...document.querySelectorAll('#c-staging [data-fid]')].map(n=>({n,r:n.getBoundingClientRect()}));
+  const bLo=[...document.querySelectorAll('#c-local .commit')].map(n=>({n,r:n.getBoundingClientRect()}));
+
+  const C={wd:$("#c-wd"),staging:$("#c-staging"),local:$("#c-local"),github:$("#c-github")};
+  Object.values(C).forEach(c=>c.innerHTML="");
+
+  if(s.wd.length)s.wd.forEach(f=>C.wd.appendChild(card(f)));
+  else C.wd.appendChild(el("div","empty","hier liegt noch nichts"));
+  if(s.st.length)s.st.forEach(f=>C.staging.appendChild(card(f)));
+  else C.staging.appendChild(el("div","empty","leer"));
+
+  if(s.br)C.local.appendChild(branchChain(s.br));
+  else if(s.hasLocal)C.local.appendChild(chain(s.local,s.fresh,true));
+  else C.local.appendChild(el("div","empty","gibt es noch nicht"));
+
+  if(s.hasGH){
+    if(s.ghFiles){const b=el("div");b.style.cssText="display:flex;flex-direction:column;gap:6px";
+      FILES.forEach(f=>b.appendChild(card(s.ghTag?{name:FILES.find(x=>x.id===f.id).name,tag:s.ghTag}:f)));C.github.appendChild(b)}
+    C.github.appendChild(chain(s.gh,s.freshGH));
+    if(s.pages){const p=el("div","pages",'<div class="k">ÖFFENTLICHE ADRESSE · GITHUB PAGES</div>'+
+      '<div class="u">seb.github.io/prototyp</div>');C.github.appendChild(p)}
+  } else if(s.repos){
+    s.repos.forEach(r=>{const b=el("div","repo"+(r.hot?" hot":""));
+      b.innerHTML=`<div class="rn">${r.name}</div><div class="rd">${r.note}</div>`;
+      C.github.appendChild(b)});
+    if(s.prNote)C.github.appendChild(el("div","prnote",s.prNote));
+  } else C.github.appendChild(el("div","empty","gibt es noch nicht"));
+
+  document.querySelectorAll(".place").forEach(p=>{
+    p.dataset.live=(s.live||[]).includes(p.dataset.key)?"1":"0";
+    const v=(p.dataset.key==="local"&&!s.hasLocal)||(p.dataset.key==="github"&&!s.hasGH);
+    p.dataset.void=v?"1":"0";
+  });
+  $("#zoneL").textContent=s.zoneL||"DEIN RECHNER";
+  $("#zoneR").textContent=s.zoneR||"IM INTERNET";
+  drawWires(s);
+
+  if(dir===1)requestAnimationFrame(()=>{
+    if(s.flyAdd){const t=[...document.querySelectorAll('#c-staging [data-fid]')];
+      bWd.forEach((x,k)=>{if(t[k])fly(x.r,t[k].getBoundingClientRect(),x.n,540)})}
+    if(s.flyCommit){const t=[...document.querySelectorAll('#c-local .commit')];
+      const last=t[t.length-1];if(last&&bSt[0])fly(bSt[0].r,last.getBoundingClientRect(),bSt[0].n,580)}
+    if(s.flyPush){const t=[...document.querySelectorAll('#c-github .commit')];
+      const last=t[t.length-1];if(last&&bLo.length)fly(bLo[bLo.length-1].r,last.getBoundingClientRect(),bLo[bLo.length-1].n,620)}
+  });
+
+  $("#stNo").textContent="SCHRITT "+(i+1)+" VON "+steps().length;
+  $("#stRail").textContent="· "+s.rail.toUpperCase();
+  $("#stTitle").textContent=s.title;$("#stBody").innerHTML=s.body;
+  const h=$("#howBody");
+  if(s.how){h.innerHTML=`<ol>${s.how.d.map(x=>`<li>${x}</li>`).join("")}</ol>`+
+    `<details><summary>Dasselbe im Terminal</summary><div class="term">${s.how.t}</div></details>`}
+  else h.innerHTML=`<div class="none">Hier ist nichts zu tun — nur zu verstehen.</div>`;
+
+  document.querySelectorAll("#steps li").forEach((li,k)=>{
+    li.setAttribute("aria-current",k===i?"step":"false");li.dataset.done=k<i?"1":"0"});
+  $("#prev").disabled=i===0;$("#next").disabled=i===steps().length-1;
+  closePop();
+}
+
+function openPop(k,a){const p=$("#pop"),d=POPS[k];if(!d)return;
+  $("#popBody").innerHTML=`<h4>${d.h}</h4>${d.t}`;
+  const host=$("#places").getBoundingClientRect(),r=a.getBoundingClientRect();
+  let l=r.left-host.left+r.width/2-143;l=Math.max(4,Math.min(l,host.width-290));
+  p.style.left=l+"px";p.style.top=Math.max(6,r.top-host.top+54)+"px";p.dataset.open="1"}
+const closePop=()=>$("#pop").dataset.open="0";
+
+const tabs=$("#tabs");
+SC.forEach((s,i)=>{const b=el("button","",s.tab);
+  if(!s.ready){b.disabled=true;b.title="kommt noch"}else b.onclick=()=>{sc=i;cur=0;boot()};
+  if(i===0)b.setAttribute("aria-selected","true");tabs.appendChild(b)});
+function boot(){
+  document.querySelectorAll("#tabs button").forEach((b,i)=>b.setAttribute("aria-selected",i===sc?"true":"false"));
+  $("#scTitle").textContent=SC[sc].title;$("#scSub").textContent=SC[sc].sub;
+  const ol=$("#steps");ol.innerHTML="";
+  steps().forEach((s,k)=>{const li=el("li");
+    const b=el("button","",`<span class="num">${k+1}</span><span class="lbl">${s.rail}</span>`);
+    b.onclick=()=>{const d=k>cur?1:-1;cur=k;render(cur,d)};li.appendChild(b);ol.appendChild(li)});
+  render(0,1)}
+document.querySelectorAll(".place").forEach(p=>p.onclick=e=>{
+  e.stopPropagation();if(p.dataset.void!=="1")openPop(p.dataset.key,p)});
+$("#popX").onclick=e=>{e.stopPropagation();closePop()};
+$("#pop").onclick=e=>e.stopPropagation();
+document.body.onclick=closePop;
+$("#prev").onclick=()=>{if(cur>0){cur--;render(cur,-1)}};
+$("#next").onclick=()=>{if(cur<steps().length-1){cur++;render(cur,1)}};
+document.addEventListener("keydown",e=>{
+  if(e.key==="ArrowRight"&&cur<steps().length-1){cur++;render(cur,1)}
+  if(e.key==="ArrowLeft"&&cur>0){cur--;render(cur,-1)}
+  if(e.key==="Escape")closePop()});
+window.addEventListener("resize",()=>drawWires(steps()[cur]));
+boot();
+</script>
+</body>
+</html>
