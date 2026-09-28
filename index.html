@@ -221,8 +221,8 @@ const SC=[{id:1,tab:"Ich hab was gebaut",ready:true,
  how:null,wd:ALL,st:[],hasLocal:false,hasGH:false,live:["wd"]},
 
 {rail:"Versionskontrolle einschalten",title:"Aus dem Ordner wird ein Projekt",
- body:`Zwei Dinge, die man leicht verwechselt. <b>Git ist ein Programm auf deinem Rechner</b> — GitHub Desktop bringt es mit, du musst nichts extra besorgen. Davon getrennt schaltest du Git <b>in diesem einen Ordner</b> ein. Dabei entsteht ein versteckter Unterordner <b>.git</b>, in dem Git ab jetzt Buch führt. Deine Dateien bleiben unangetastet.`,
- how:{d:["In GitHub Desktop: <b>File → Add local repository</b>","Deinen Ordner auswählen","Die App meldet, dass hier noch kein Repository ist, und bietet <b>create a repository</b> an — das anklicken"],
+ body:`Zwei Dinge, die man leicht verwechselt. <b>Git ist ein Programm auf deinem Rechner</b> — GitHub Desktop bringt es mit, du musst nichts extra besorgen. Davon getrennt schaltest du Git <b>in diesem einen Ordner</b> ein. Dabei entsteht ein versteckter Unterordner <b>.git</b>, in dem Git ab jetzt Buch führt. Deine Dateien bleiben unangetastet.<br><br><b>Ein Unterschied, der überrascht:</b> Im Terminal legt <code>git init</code> wirklich nur diesen Ordner an — danach stehst du vor einem leeren Packtisch. GitHub Desktop setzt dagegen sofort einen ersten Commit mit allem, was schon im Ordner liegt. Die nächsten beiden Schritte nimmt dir die App beim ersten Mal also ab. Ab der ersten Änderung machst du sie selbst.`,
+ how:{d:["In GitHub Desktop: <b>File → Add local repository</b>","Deinen Ordner auswählen","Die App meldet, dass hier noch kein Repository ist, und bietet <b>create a repository</b> an — das anklicken","Danach steht links nichts zum Ankreuzen: Die App hat schon alles festgehalten, was im Ordner lag"],
       t:"<code>git init</code> — im Ordner ausgeführt. Legt den versteckten Unterordner <code>.git</code> an. Mehr passiert nicht: keine Datei wird verändert, nichts wird hochgeladen."},
  wd:ALL,st:[],hasLocal:true,local:0,hasGH:false,live:["local"],hint:"Der Menüpunkt klingt nach Sortieren. Tatsächlich wird hier die Versionskontrolle eingeschaltet."},
 
